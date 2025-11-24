@@ -47,4 +47,5 @@ export const handlePay = async (paymentInfo: any, setPaymentInfo: any) => {
     alert('Error adding payment info to Firestore');
   }
 };
+
 export { db,database };

